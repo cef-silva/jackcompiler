@@ -1,5 +1,6 @@
 package br.ufma.ecp;
 
+import br.ufma.ecp.VMWriter.Command;
 import br.ufma.ecp.VMWriter.Segment;
 
 import br.ufma.ecp.token.Token;
@@ -29,6 +30,35 @@ public class Parser {
 
     public String VMOutput() {
         return vmWriter.vmOutput();
+    }
+
+    public void compileOperators(TokenType type) {
+
+        if (type == TokenType.ASTERISK) {
+            vmWriter.writeCall("Math.multiply", 2);
+        } else if (type == TokenType.SLASH) {
+            vmWriter.writeCall("Math.divide", 2);
+        } else {
+            vmWriter.writeArithmetic(typeOperator(type));
+        }
+    }
+
+    private Command typeOperator(TokenType type) {
+        if (type == TokenType.PLUS)
+            return Command.ADD;
+        if (type == TokenType.MINUS)
+            return Command.SUB;
+        if (type == TokenType.LT)
+            return Command.LT;
+        if (type == TokenType.GT)
+            return Command.GT;
+        if (type == TokenType.EQ)
+            return Command.EQ;
+        if (type == TokenType.AND)
+            return Command.AND;
+        if (type == TokenType.OR)
+            return Command.OR;
+        return null;
     }
 
     void parse() {
@@ -204,9 +234,10 @@ public class Parser {
     void parseExpression() {
         printNonTerminal("expression");
         parseTerm ();
-        while (isOperator(peekToken.lexeme)) {
+        while (isOperator(peekToken.type)) {
+            var ope = expectPeek(peekToken.type);
             expectPeek(peekToken.type);
-            parseTerm();
+            compileOperators(ope);
         }
         printNonTerminal("/expression");
     }
