@@ -184,7 +184,13 @@ public class Parser {
         switch (peekToken.type) {
           case NUMBER:
             expectPeek(TokenType.NUMBER);
-          vmWriter.writePush(Segment.CONST, Integer.parseInt(currentToken.lexeme));
+            var strValue = currentToken.lexeme;
+            vmWriter.writePush(Segment.CONST, Integer.parseInt(currentToken.lexeme));
+            vmWriter.writeCall("String.new", 1);
+            for (int i = 0; i < strValue.length(); i++) {
+                vmWriter.writePush(Segment.CONST, strValue.charAt(i));
+                vmWriter.writeCall("String.appendChar", 2);
+            }
           break;
           case STRING:
             expectPeek(TokenType.STRING);
