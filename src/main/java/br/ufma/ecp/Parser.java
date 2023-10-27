@@ -16,6 +16,8 @@ public class Parser {
     private StringBuilder xmlOutput = new StringBuilder();
     private String className;
     private VMWriter vmWriter = new VMWriter();
+    private int ifLabelNum = 0 ;
+    private int whileLabelNum = 0;
 
 
     public Parser(byte[] input) {
@@ -65,6 +67,8 @@ public class Parser {
         parseClass();
     }
 
+    
+
     void parseClass() {
         printNonTerminal("class");
         expectPeek(TokenType.CLASS);
@@ -88,13 +92,29 @@ public class Parser {
     void parseIf() {
         printNonTerminal("ifStatement");
     
+        var labelTrue = "IF_TRUE" + ifLabelNum;
+        var labelFalse = "IF_FALSE" + ifLabelNum;
+        var labelEnd = "IF_END" + ifLabelNum;
+
+        ifLabelNum++;
+
         expectPeek(TokenType.IF);
         expectPeek(TokenType.LPAREN);
         parseExpression();
-        expectPeek(TokenType.RPAREN);    
+        expectPeek(TokenType.RPAREN);
+        
+        vmWriter.writeIf(labelTrue);
+        vmWriter.writeGoto(labelFalse);
+        vmWriter.writeLabel(labelTrue);
+
         expectPeek(TokenType.LBRACE);
         parseStatements();
         expectPeek(TokenType.RBRACE);
+        if (peekTokenIs(TokenType.ELSE)) {
+            vmWriter.writeGoto(labelEnd);
+        }
+
+        vmWriter.writeLabel(labelFalse);
 
 
         if (peekTokenIs(TokenType.ELSE))
@@ -106,6 +126,7 @@ public class Parser {
             parseStatements();
 
             expectPeek(TokenType.RBRACE);
+            vmWriter.writeLabel(labelEnd);
         }
 
         printNonTerminal("/ifStatement");
@@ -349,6 +370,8 @@ public class Parser {
     void parseSubroutineDec() {
         printNonTerminal("subroutineDec");
 
+        ifLabelNum = 0;
+        whileLabelNum = 0;
 
         expectPeek(TokenType.CONSTRUCTOR, TokenType.FUNCTION, TokenType.METHOD);
         var subroutineType = currentToken.type;
