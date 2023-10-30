@@ -408,7 +408,7 @@ public class Parser {
         expectPeek(TokenType.VOID, TokenType.INT, TokenType.CHAR, TokenType.BOOLEAN, TokenType.IDENT);
         expectPeek(TokenType.IDENT);
 
-        var functionName = className + "." + currentToken.value();
+        var functionName = className + "." + currentToken.lexeme;
 
         expectPeek(TokenType.LPAREN);
         parseParameterList();
@@ -455,7 +455,9 @@ public class Parser {
         while (peekTokenIs(TokenType.VAR)) {
             parseVarDec();
         }
-        
+        var nlocals = symTable.varCount(Kind.VAR);
+
+        vmWriter.writeFunction(functionName, nlocals);
 
         parseStatements();
         expectPeek(TokenType.RBRACE);
