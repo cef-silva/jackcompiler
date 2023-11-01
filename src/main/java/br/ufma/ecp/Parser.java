@@ -215,6 +215,7 @@ public class Parser {
         expectPeek(TokenType.IDENT);
         parseSubroutineCall();
         expectPeek(TokenType.SEMICOLON);
+        vmWriter.writePop(Segment.TEMP, 0);
 
         printNonTerminal("/doStatement");
     }
@@ -413,7 +414,7 @@ public class Parser {
         }
         vmWriter.writeCall(functionName, nArgs);
     }
-    
+
     void parseClassVarDec() {
         printNonTerminal("classVarDec");
         expectPeek(TokenType.FIELD, TokenType.STATIC);
