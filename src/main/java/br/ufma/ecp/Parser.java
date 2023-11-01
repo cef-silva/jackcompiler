@@ -382,26 +382,38 @@ public class Parser {
 
         var nArgs = 0;
 
+        var ident = currentToken.lexeme;
+        var symbol = symTable.resolve(ident); // classe ou objeto
+        var functionName = ident + ".";
 
         if (peekTokenIs(TokenType.LPAREN)) { // método da propria classe
             expectPeek(TokenType.LPAREN);
- 
+            vmWriter.writePush(Segment.POINTER, 0);
             nArgs = parseExpressionList() + 1;
             expectPeek(TokenType.RPAREN);
+            functionName = className + '.' + ident;
 
         } else {
             // pode ser um metodo de um outro objeto ou uma função
             expectPeek(TokenType.DOT);
             expectPeek(TokenType.IDENT); // nome da função
 
+            if (symbol != null) { // é um metodo
+                functionName = symbol.type() + "." + currentToken.lexeme;
+                vmWriter.writePush(kind2Segment(symbol.kind()), symbol.index());
+                nArgs = 1; // do proprio objeto
+            } else {
+                functionName += currentToken.lexeme; // é uma função
+            }
+
             expectPeek(TokenType.LPAREN);
             nArgs += parseExpressionList();
-
+    
             expectPeek(TokenType.RPAREN);
         }
-       
+        vmWriter.writeCall(functionName, nArgs);
     }
-
+    
     void parseClassVarDec() {
         printNonTerminal("classVarDec");
         expectPeek(TokenType.FIELD, TokenType.STATIC);
