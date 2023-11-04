@@ -10,7 +10,8 @@ import br.ufma.ecp.token.TokenType;
 
 public class Parser {
 
-   private static class ParseError extends RuntimeException {}
+    private static class ParseError extends RuntimeException {
+    }
 
     private Scanner scan;
     private Token currentToken;
@@ -18,10 +19,9 @@ public class Parser {
     private StringBuilder xmlOutput = new StringBuilder();
     private String className;
     private VMWriter vmWriter = new VMWriter();
-    private int ifLabelNum = 0 ;
+    private int ifLabelNum = 0;
     private int whileLabelNum = 0;
     private SymbolTable symTable = new SymbolTable();
-
 
     public Parser(byte[] input) {
         scan = new Scanner(input);
@@ -82,13 +82,11 @@ public class Parser {
         parseClass();
     }
 
-    
-
     void parseClass() {
         printNonTerminal("class");
         expectPeek(TokenType.CLASS);
         expectPeek(TokenType.IDENT);
-        className = currentToken.value();
+        className = currentToken.lexeme;
         expectPeek(TokenType.LBRACE);
 
         while (peekTokenIs(TokenType.STATIC) || peekTokenIs(TokenType.FIELD)) {
@@ -106,7 +104,7 @@ public class Parser {
 
     void parseIf() {
         printNonTerminal("ifStatement");
-    
+
         var labelTrue = "IF_TRUE" + ifLabelNum;
         var labelFalse = "IF_FALSE" + ifLabelNum;
         var labelEnd = "IF_END" + ifLabelNum;
@@ -117,7 +115,7 @@ public class Parser {
         expectPeek(TokenType.LPAREN);
         parseExpression();
         expectPeek(TokenType.RPAREN);
-        
+
         vmWriter.writeIf(labelTrue);
         vmWriter.writeGoto(labelFalse);
         vmWriter.writeLabel(labelTrue);
@@ -131,9 +129,7 @@ public class Parser {
 
         vmWriter.writeLabel(labelFalse);
 
-
-        if (peekTokenIs(TokenType.ELSE))
-        {
+        if (peekTokenIs(TokenType.ELSE)) {
             expectPeek(TokenType.ELSE);
 
             expectPeek(TokenType.LBRACE);
@@ -168,16 +164,15 @@ public class Parser {
         parseStatements();
 
         vmWriter.writeGoto(labelTrue);
-        vmWriter.writeGoto(labelFalse);
+        vmWriter.writeLabel(labelFalse);
 
         expectPeek(TokenType.RBRACE);
         printNonTerminal("/whileStatement");
     }
 
-
     void parseStatements() {
         printNonTerminal("statements");
-        while ( peekToken.type == TokenType.LET ||
+        while (peekToken.type == TokenType.LET ||
                 peekToken.type == TokenType.RETURN ||
                 peekToken.type == TokenType.DO ||
                 peekToken.type == TokenType.WHILE ||
@@ -209,6 +204,7 @@ public class Parser {
                 throw error(peekToken, "Expected a statement");
         }
     }
+
     void parseDo() {
         printNonTerminal("doStatement");
         expectPeek(TokenType.DO);
@@ -237,85 +233,90 @@ public class Parser {
     void parseTerm() {
         printNonTerminal("term");
         switch (peekToken.type) {
-          case NUMBER:
-            expectPeek(TokenType.NUMBER);
-            var strValue = currentToken.lexeme;
-            vmWriter.writePush(Segment.CONST, Integer.parseInt(currentToken.lexeme));
-            vmWriter.writeCall("String.new", 1);
-            for (int i = 0; i < strValue.length(); i++) {
-                vmWriter.writePush(Segment.CONST, strValue.charAt(i));
-                vmWriter.writeCall("String.appendChar", 2);
-            }
-          break;
-          case STRING:
-            expectPeek(TokenType.STRING);
-            break;
-          case FALSE:
-          case NULL:
-          case TRUE:
-            expectPeek(TokenType.FALSE, TokenType.NULL, TokenType.TRUE);
-            vmWriter.writePush(Segment.CONST, 0);
-            if (currentToken.type == TokenType.TRUE)
-                vmWriter.writeArithmetic(Command.NOT);
-            break;
-          case THIS:
-            expectPeek(TokenType.THIS);
-            vmWriter.writePush(Segment.POINTER, 0);
-            break;
-          case IDENT:
-            expectPeek(TokenType.IDENT);
+            case NUMBER:
+                expectPeek(TokenType.NUMBER);
+                vmWriter.writePush(Segment.CONST, Integer.parseInt(currentToken.lexeme));
+                break;
+            case STRING:
+                expectPeek(TokenType.STRING);
+                var strValue = currentToken.lexeme;
+                vmWriter.writePush(Segment.CONST, strValue.length());
+                vmWriter.writeCall("String.new", 1);
+                for (int i = 0; i < strValue.length(); i++) {
+                    vmWriter.writePush(Segment.CONST, strValue.charAt(i));
+                    vmWriter.writeCall("String.appendChar", 2);
+                }
+                break;
+            case FALSE:
+            case NULL:
+            case TRUE:
+                expectPeek(TokenType.FALSE, TokenType.NULL, TokenType.TRUE);
+                vmWriter.writePush(Segment.CONST, 0);
+                if (currentToken.type == TokenType.TRUE) {
+                    vmWriter.writeArithmetic(Command.NOT);
+                }
+                break;
+            case THIS:
+                expectPeek(TokenType.THIS);
+                vmWriter.writePush(Segment.POINTER, 0);
+                break;
+            case IDENT:
+                expectPeek(TokenType.IDENT);
 
-            Symbol sym = symTable.resolve(currentToken.lexeme);
+                Symbol sym = symTable.resolve(currentToken.lexeme);
 
-            if (peekTokenIs(TokenType.LPAREN) || peekTokenIs(TokenType.DOT)) {
+                if (peekTokenIs(TokenType.LPAREN) || peekTokenIs(TokenType.DOT)) {
                     parseSubroutineCall();
-                } else { // variavel comum ou array
-                    if (peekTokenIs(TokenType.LBRACKET)) { // array
+                } else {
+                    if (peekTokenIs(TokenType.LBRACKET)) {
                         expectPeek(TokenType.LBRACKET);
                         parseExpression();
                         vmWriter.writePush(kind2Segment(sym.kind()), sym.index());
                         vmWriter.writeArithmetic(Command.ADD);
 
-                        expectPeek(TokenType.RBRACKET);// push the value of the address pointer back onto stack
-                        vmWriter.writePop(Segment.POINTER, 1); // pop address pointer into pointer 1
-                        vmWriter.writePush(Segment.THAT, 0);   // push the value of the address pointer back onto stack
+                        expectPeek(TokenType.RBRACKET);
+                        vmWriter.writePop(Segment.POINTER, 1);
+                        vmWriter.writePush(Segment.THAT, 0);
+
                     } else {
                         vmWriter.writePush(kind2Segment(sym.kind()), sym.index());
                     }
                 }
-            break;
-        case LPAREN:
-            expectPeek(TokenType.LPAREN);
-            parseExpression();
-            expectPeek(TokenType.RPAREN);
-            break;
-        case MINUS:
-        case NOT:
-            expectPeek(TokenType.MINUS, TokenType.NOT);
-            var op = currentToken.type;
-            parseTerm();
-            if (op == TokenType.MINUS)
-                vmWriter.writeArithmetic(Command.NEG);
-            else
-                vmWriter.writeArithmetic(Command.NOT);
-            break;
-          default:
-            throw error(peekToken, "term expected");
+                break;
+            case LPAREN:
+                expectPeek(TokenType.LPAREN);
+                parseExpression();
+                expectPeek(TokenType.RPAREN);
+                break;
+            case MINUS:
+            case NOT:
+                expectPeek(TokenType.MINUS, TokenType.NOT);
+                var op = currentToken.type;
+                parseTerm();
+                if (op == TokenType.MINUS) {
+                    vmWriter.writeArithmetic(Command.NEG);
+                } else {
+                    vmWriter.writeArithmetic(Command.NOT);
+                }
+                break;
+            default:
+                throw error(peekToken, "term expected");
         }
 
         printNonTerminal("/term");
-      }
+    }
 
     static public boolean isOperator(String op) {
-        return "+-*/<>=~&|".contains(op);
-   }
+        return op != "" && "+-*/<>=~&|".contains(op);
+    }
 
     void parseExpression() {
         printNonTerminal("expression");
-        parseTerm ();
+        parseTerm();
         while (isOperator(peekToken.lexeme)) {
             var ope = peekToken.type;
             expectPeek(peekToken.type);
+            parseTerm();
             compileOperators(ope);
         }
         printNonTerminal("/expression");
@@ -367,11 +368,11 @@ public class Parser {
 
         expectPeek(TokenType.EQ);
         parseExpression();
-        if(isArray) {
-            vmWriter.writePop(Segment.TEMP, 0);    // push result back onto stack
+        if (isArray) {
+            vmWriter.writePop(Segment.TEMP, 0); // push result back onto stack
             vmWriter.writePop(Segment.POINTER, 1); // pop address pointer into pointer 1
-            vmWriter.writePush(Segment.TEMP, 0);   // push result back onto stack
-            vmWriter.writePop(Segment.THAT, 0);    // Store right hand side evaluation in THAT 0.
+            vmWriter.writePush(Segment.TEMP, 0); // push result back onto stack
+            vmWriter.writePop(Segment.THAT, 0); // Store right hand side evaluation in THAT 0.
         } else {
             vmWriter.writePop(kind2Segment(symbol.kind()), symbol.index());
         }
@@ -409,7 +410,7 @@ public class Parser {
 
             expectPeek(TokenType.LPAREN);
             nArgs += parseExpressionList();
-    
+
             expectPeek(TokenType.RPAREN);
         }
         vmWriter.writeCall(functionName, nArgs);
@@ -429,7 +430,7 @@ public class Parser {
 
         expectPeek(TokenType.IDENT);
         String name = currentToken.lexeme;
-        
+
         symTable.define(name, type, kind);
         while (peekTokenIs(TokenType.COMMA)) {
             expectPeek(TokenType.COMMA);
@@ -564,7 +565,6 @@ public class Parser {
         xmlOutput.append(String.format("<%s>\r\n", nterminal));
     }
 
-
     boolean peekTokenIs(TokenType type) {
         return peekToken.type == type;
     }
@@ -581,7 +581,7 @@ public class Parser {
             }
         }
 
-       throw error(peekToken, "Expected a statement");
+        throw error(peekToken, "Expected a statement");
 
     }
 
@@ -590,17 +590,15 @@ public class Parser {
             nextToken();
             xmlOutput.append(String.format("%s\r\n", currentToken.toString()));
         } else {
-            throw error(peekToken, "Expected "+type.name());
+            throw error(peekToken, "Expected " + type.name());
         }
     }
 
-
     private static void report(int line, String where,
-        String message) {
-            System.err.println(
-            "[line " + line + "] Error" + where + ": " + message);
+            String message) {
+        System.err.println(
+                "[line " + line + "] Error" + where + ": " + message);
     }
-
 
     private ParseError error(Token token, String message) {
         if (token.type == TokenType.EOF) {
@@ -610,6 +608,5 @@ public class Parser {
         }
         return new ParseError();
     }
-
 
 }
